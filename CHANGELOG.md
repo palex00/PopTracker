@@ -1,6 +1,6 @@
 # PopTracker Changelog
 
-## v0.32.1-rc1
+## v0.32.1
 
 * Fixes
   * Fix load state and reset button not un-clearing already-cleared location sections
