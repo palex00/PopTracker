@@ -664,7 +664,6 @@ void TrackerView::updateItem(Item* w, const BaseItem& item)
 void TrackerView::updateState(const std::string& itemid)
 {
     const auto& item = _tracker->getItemById(itemid);
-    printf("update state of %s: \"%s\"\n", itemid.c_str(), item.getName().c_str());
     for (auto w: _items[itemid]) {
         updateItem(w, item);
     }

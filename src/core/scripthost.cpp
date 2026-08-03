@@ -131,8 +131,6 @@ ScriptHost::ScriptHost(Pack* pack, lua_State *L, Tracker *tracker)
             auto name = pair.first;
             bool isWildcard = pair.second.code == "*";
             if (isWildcard || item.canProvideCode(pair.second.code)) {
-                printf("Item %s changed, which can provide code \"%s\" for watch \"%s\"\n",
-                        id.c_str(), pair.second.code.c_str(), pair.first.c_str());
                 lua_rawgeti(_L, LUA_REGISTRYINDEX, pair.second.callback);
                 if (isWildcard)
                     lua_pushstring(_L, item.getCodesString().c_str()); // arg1: item code(s)
