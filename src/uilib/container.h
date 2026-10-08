@@ -154,8 +154,8 @@ protected:
     explicit Container(const int x=0, const int y=0, const int w=0, const int h=0)
         : Widget(x,y,w,h)
     {
-        onMouseDown += { this, [this](void*, const int localX, const int localY, const int button) {
-            const auto [x, y] = toChildSpace(localX, localY);
+        onMouseDown += { this, [this](void*, const int rawX, const int rawY, const int button) {
+            const auto [x, y] = toChildSpace(rawX, rawY);
             for (auto childIt = _children.rbegin(); childIt != _children.rend(); ++childIt) {
                 const auto child = *childIt;
                 if (child->getVisible() && child->isHit(x, y)) {
@@ -165,8 +165,8 @@ protected:
                 }
             }
         }};
-        onClick += { this, [this](void*, const int localX, const int localY, const int button) {
-            const auto [x, y] = toChildSpace(localX, localY);
+        onClick += { this, [this](void*, const int rawX, const int rawY, const int button) {
+            const auto [x, y] = toChildSpace(rawX, rawY);
             for (auto childIt = _children.rbegin(); childIt != _children.rend(); ++childIt) {
                 const auto child = *childIt;
                 if (child->getVisible() && child->isHit(x, y)) {
@@ -185,8 +185,8 @@ protected:
                 oldPressedChild->onMouseCancel.emit(oldPressedChild);
             }
         }};
-        onMouseMove += { this, [this](void*, const int localX, const int localY, const unsigned buttons) {
-            const auto [x, y] = toChildSpace(localX, localY);
+        onMouseMove += { this, [this](void*, const int rawX, const int rawY, const unsigned buttons) {
+            const auto [x, y] = toChildSpace(rawX, rawY);
             auto oldHoverChild = _hoverChild;
             bool match = false;
             for (auto childIt = _children.rbegin(); childIt != _children.rend(); ++childIt) {
