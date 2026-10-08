@@ -611,6 +611,9 @@ the final hierarchy looks something like this: `json root -> "tracker_default" -
 * `"dock"`: like array, but uses `"dock"` to place children
 * `"array"`: like dock, but uses `"orientation"` instead of `"dock"` to place children
 * `"tabbed"`: tabs that switch between multiple children, has `"tabs": [ {"title":"...","content":{...}} ]`
+  * the tabbed widget is as large as its largest tab, including hidden tabs. Set `"scale_to_fit": true` on a tab to
+    instead scale that tab's content down when there is not enough space, so it no longer forces a minimum size
+    (e.g. `{"title":"...","scale_to_fit":true,"content":{...}}`). Not useful for maps, which already scale.
 * `"group"`: has a single child + a header (`"header": "text"`)
 * `"item"`: a single item (`"item": "item_code"`, )
 * `"itemgrid"`: has `"rows"` as an array of rows, each being an array of `item_code` strings

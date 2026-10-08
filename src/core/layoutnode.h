@@ -35,6 +35,7 @@ protected:
     LayoutTypes::Size _maxSize;
     LayoutTypes::Spacing _margin;
     bool _compact;
+    bool _scaleToFit = false;
     LayoutTypes::OptionalBool _dropShadow;
     std::string _item;
     std::string _header;
@@ -48,6 +49,7 @@ protected:
 public:
     // TODO: more getters
     const std::string& getType() const { return _type; }
+    bool getScaleToFit() const { return _scaleToFit; }
     const std::string& getKey() const { return _key; }
     const std::string& getItem() const { return _item; }
     const std::string& getIcon() const { return _item; /* reuse item for icon since they are exclusive */ }

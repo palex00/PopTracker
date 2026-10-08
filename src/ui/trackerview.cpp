@@ -14,6 +14,7 @@
 #include "../uilib/dock.h"
 #include "../uilib/hbox.h"
 #include "../uilib/image.h"
+#include "../uilib/scalebox.h"
 #include "../uilib/scrollvbox.h"
 #include "../uilib/simplecontainer.h"
 #include "../uilib/tabs.h"
@@ -777,7 +778,19 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
             fprintf(stderr, "WARNING: tabbed widget with 0 tabs\n");
         w->reserve(children.size());
         for (const auto& childnode: children) {
-            if (addLayoutNode(w, childnode, depth+1)) {
+            bool added;
+            if (childnode.getScaleToFit()) {
+                // tab content scales down instead of forcing the tabbed widget's min size
+                auto scaleBox = new ScaleBox(0, 0, w->getWidth(), w->getHeight());
+                added = addLayoutNode(scaleBox, childnode, depth+1);
+                if (added)
+                    w->addChild(scaleBox);
+                else
+                    delete scaleBox;
+            } else {
+                added = addLayoutNode(w, childnode, depth+1);
+            }
+            if (added) {
                 const auto& name = childnode.getHeader();
                 w->setTabName(-1, name);
                 const auto& icon = childnode.getIcon();

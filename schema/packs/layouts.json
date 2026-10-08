@@ -309,6 +309,11 @@
                                     "description": "Icon to display next to the title.",
                                     "type": "string"
                                 },
+                                "scale_to_fit": {
+                                    "description": "If true, the tab's content is scaled down to fit when there is not enough space, instead of forcing a minimum size onto the tabbed widget and all its parents.",
+                                    "type": "boolean",
+                                    "default": false
+                                },
                                 "content": {
                                     "description": "Content of the tab.",
                                     "anyOf": [

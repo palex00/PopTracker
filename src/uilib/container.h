@@ -107,18 +107,18 @@ public:
             return false;
         if (_backgroundColor.a && Widget::isHit(x, y))
             return true;
-        x -= _pos.left;
-        y -= _pos.top;
+        const auto p = toChildSpace(x - _pos.left, y - _pos.top);
         for (const auto& w: _children) {
-            if (w->isHit(x, y))
+            if (w->isHit(p.left, p.top))
                 return true;
         }
         return false;
     }
 
     const Widget* getHit(int x, int y) const override {
+        const auto p = toChildSpace(x, y);
         for (const auto& w: _children) {
-            if (w->getHit(x - w->getLeft(), y - w->getTop())) return w;
+            if (w->getHit(p.left - w->getLeft(), p.top - w->getTop())) return w;
         }
         if (Widget::isHit(x + _pos.left, y + _pos.top)) return this;
         return nullptr;
@@ -145,10 +145,17 @@ protected:
     Widget* _hoverChild = nullptr;
     Widget* _pressedChild = nullptr;
 
+    /// Maps a position in this container's local space to the space its children are laid out in.
+    virtual Position toChildSpace(const int x, const int y) const
+    {
+        return {x, y};
+    }
+
     explicit Container(const int x=0, const int y=0, const int w=0, const int h=0)
         : Widget(x,y,w,h)
     {
-        onMouseDown += { this, [this](void*, const int x, const int y, const int button) {
+        onMouseDown += { this, [this](void*, const int localX, const int localY, const int button) {
+            const auto [x, y] = toChildSpace(localX, localY);
             for (auto childIt = _children.rbegin(); childIt != _children.rend(); ++childIt) {
                 const auto child = *childIt;
                 if (child->getVisible() && child->isHit(x, y)) {
@@ -158,7 +165,8 @@ protected:
                 }
             }
         }};
-        onClick += { this, [this](void*, const int x, const int y, const int button) {
+        onClick += { this, [this](void*, const int localX, const int localY, const int button) {
+            const auto [x, y] = toChildSpace(localX, localY);
             for (auto childIt = _children.rbegin(); childIt != _children.rend(); ++childIt) {
                 const auto child = *childIt;
                 if (child->getVisible() && child->isHit(x, y)) {
@@ -177,7 +185,8 @@ protected:
                 oldPressedChild->onMouseCancel.emit(oldPressedChild);
             }
         }};
-        onMouseMove += { this, [this](void*, const int x, const int y, const unsigned buttons) {
+        onMouseMove += { this, [this](void*, const int localX, const int localY, const unsigned buttons) {
+            const auto [x, y] = toChildSpace(localX, localY);
             auto oldHoverChild = _hoverChild;
             bool match = false;
             for (auto childIt = _children.rbegin(); childIt != _children.rend(); ++childIt) {
