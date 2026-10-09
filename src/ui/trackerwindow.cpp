@@ -55,17 +55,26 @@ void TrackerWindow::setTracker(Tracker* tracker, const std::string& layout)
             _view->setHideUnreachableLocations(_hideUnreachableLocations);
         _rendered = false;
         addChild(_view);
+        _viewPreferredSize = _view->getPreferredSize();
 
         _view->onMinSizeChanged += {this, [this](void*) {
+            // adding/removing a map tooltip also fires this; only react to changes of the layout itself
+            Size preferredSize = _view->getPreferredSize();
+            if (preferredSize == _viewPreferredSize)
+                return;
+            _viewPreferredSize = preferredSize;
             //Size curSize = Size::FromPosition(_view->getPosition()+_view->getSize());
             Size curSize = getSize();
-            Size minSize = Size::FromPosition(_view->getPosition()+_view->getPreferredSize());
+            Size minSize = Size::FromPosition(_view->getPosition()+preferredSize);
             Size newSize = (curSize || minSize || Size{96,96}) && Size{8192,4096};
             if (newSize != curSize) {
                 printf("Layout changed ... ");
                 printf("%d,%d || %d,%d => %d,%d\n", curSize.width, curSize.height, minSize.width, minSize.height, newSize.width, newSize.height);
                 resize(newSize);
-                setMinSize(newSize);
+                if (preferredSize != _view->getMinSize()) // layout is scaled down to fit, allow smaller window
+                    setMinSize(Size::FromPosition(_view->getPosition()+_view->getMinSize()));
+                else
+                    setMinSize(newSize);
             }
         }};
         // once the layout is fixed:

@@ -48,6 +48,7 @@ public:
 protected:
     Container *_menu;
     TrackerView *_view;
+    Size _viewPreferredSize;
     bool _resizeScheduled;
     Size _resizeSize;
     bool _rendered = false;
