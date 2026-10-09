@@ -328,11 +328,6 @@
                                     "description": "Icon to display next to the title.",
                                     "type": "string"
                                 },
-                                "scale_to_fit": {
-                                    "description": "If true, the content is laid out at its natural size and drawn scaled to fit the available space (up or down, keeping its aspect ratio, centered), like a map. It then no longer forces a minimum size onto its parents.",
-                                    "type": "boolean",
-                                    "default": false
-                                },
                                 "content": {
                                     "description": "Content of the tab.",
                                     "anyOf": [
@@ -812,7 +807,7 @@
                     ]
                 },
                 "scale_to_fit": {
-                    "description": "If true, the content is laid out at its natural size and drawn scaled to fit the available space (up or down, keeping its aspect ratio, centered), like a map. It then no longer forces a minimum size onto its parents.",
+                    "description": "Only used on the top-level layout (e.g. tracker_default): if true, the window can be made smaller than the layout's minimum size, and the whole layout is then drawn scaled down to fit instead of being cut off.",
                     "type": "boolean",
                     "default": false
                 },

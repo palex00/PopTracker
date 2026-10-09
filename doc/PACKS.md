@@ -603,7 +603,7 @@ the final hierarchy looks something like this: `json root -> "tracker_default" -
         "item_h_alignment": "{left,right,center,stretch}", // align image inside item; PopTracker since 0.19.1
         "item_v_alignment": "{top,bottom,center,stretch}", // as above; stretch is not implemented for either
         "dropshadow":  bool, // enable/disable drop shadow, only partially implemented
-        "scale_to_fit": bool, // draw content scaled to fit, like a map, see below; not set by "class"
+        "scale_to_fit": bool, // top-level layout only: scale down instead of cutting off, see below
         "class":       "className" // references a layout class to inherit values from before defaults; PopTracker since 0.34.1
     }
 
@@ -623,13 +623,11 @@ the final hierarchy looks something like this: `json root -> "tracker_default" -
 
 **Scale to fit:**
 
-Items, item grids and most other layouts have a fixed size and force that size as a minimum onto everything around
-them. A `"tabbed"` widget is as large as its largest tab, even while that tab is hidden.
-With `"scale_to_fit": true`, a layout node (or a tab, e.g. `{"title":"...","scale_to_fit":true,"content":{...}}`)
-is instead laid out once at its natural size and then drawn scaled up or down to fit the space it gets, keeping its
-aspect ratio and centered, the same way a map is drawn. It then grows like a map and no longer forces a minimum size.
-Because it has no minimum size, it should be placed where it gets space, e.g. as a dock's last child, in a tab or
-next to a map in an array, not docked to a side. Not useful on maps, which already scale.
+A layout can't be shown smaller than its minimum size, which is the sum of its item grids, items and other fixed-size
+parts (maps can shrink to 200x200). A `"tabbed"` widget is as large as its largest tab, even while that tab is hidden.
+With `"scale_to_fit": true` on the top-level layout (e.g. `"tracker_default"`), the window can be made smaller than
+that. The layout is then laid out at its minimum size and drawn scaled down to fit. At or above the minimum size,
+nothing changes. The window can be shrunk down to a quarter of the minimum size. Has no effect on other layout nodes.
 
 **Margin:**
 

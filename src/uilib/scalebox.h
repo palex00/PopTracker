@@ -7,11 +7,13 @@
 
 namespace Ui {
 
-/// Container with a single child that is laid out at its natural size once, then drawn scaled to fit,
-/// keeping its aspect ratio and centered, the same way a map image is drawn.
-/// The child's min size does not propagate up, so the ScaleBox can be any size.
+/// Container with a single child that is laid out normally when there is enough space for the child's min size,
+/// and laid out at its min size and drawn scaled down to fit (keeping its aspect ratio) when there is not.
+/// It reports a fraction of the child's min size as its own min size, see MIN_SCALE.
 class ScaleBox : public Container {
 public:
+    static constexpr float MIN_SCALE = 0.25f;
+
     ScaleBox(const int x, const int y, const int w, const int h)
         : Container(x, y, w, h)
     {
@@ -26,14 +28,8 @@ public:
         Container::addChild(child);
         _hGrow = 1; // always fill available space, regardless of child
         _vGrow = 1;
-        _childMinSize = child->getMinSize();
-        const auto natural = getNaturalSize(child);
-        const auto& m = child->getMargin();
-        child->setPosition({m.left, m.top});
-        child->setSize(natural);
-        _contentSize = {m.left + natural.width + m.right, m.top + natural.height + m.bottom};
-        if (_size.width < 1 && _size.height < 1)
-            Container::setSize(_contentSize); // start at 100% until the parent decides
+        child->setPosition({child->getMargin().left, child->getMargin().top});
+        measure();
         relayout();
     }
 
@@ -47,90 +43,96 @@ public:
 
     void render(Renderer renderer, const int offX, const int offY) override
     {
+        if (_children.empty())
+            return;
+        const auto child = _children.front();
+        if (child->getMinSize() != _childMinSize) {
+            // child's min size changed since it was measured
+            measure();
+            relayout();
+        }
+        if (_scale >= 1.0f) {
+            Container::render(renderer, offX, offY);
+            return;
+        }
+        if (_scale <= 0.0f || !child->getVisible())
+            return;
         if (_backgroundColor.a > 0) {
             const auto& c = _backgroundColor;
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, c.a);
             SDL_Rect r = {offX + _pos.left, offY + _pos.top, _size.width, _size.height};
             SDL_RenderFillRect(renderer, &r);
         }
-        if (_children.empty())
-            return;
-        const auto child = _children.front();
-        if (!child->getVisible())
-            return;
-        if (child->getMinSize() != _childMinSize) {
-            // content grew since it was measured (e.g. an image finished loading)
-            _childMinSize = child->getMinSize();
-            const auto natural = getNaturalSize(child);
-            if (natural != child->getSize()) {
-                const auto& m = child->getMargin();
-                child->setSize(natural);
-                _contentSize = {m.left + natural.width + m.right, m.top + natural.height + m.bottom};
-            }
-            relayout();
-        }
-        if (_scale <= 0.0f)
-            return;
         float oldScaleX, oldScaleY;
         SDL_RenderGetScale(renderer, &oldScaleX, &oldScaleY);
         SDL_RenderSetScale(renderer, oldScaleX * _scale, oldScaleY * _scale);
         // offsets are in unscaled coordinates, the child renders in scaled coordinates
-        const int scaledOffX = static_cast<int>(std::lround((offX + _pos.left + _offset.left) / _scale));
-        const int scaledOffY = static_cast<int>(std::lround((offY + _pos.top + _offset.top) / _scale));
+        const int scaledOffX = static_cast<int>(std::lround((offX + _pos.left) / _scale));
+        const int scaledOffY = static_cast<int>(std::lround((offY + _pos.top) / _scale));
         child->render(renderer, scaledOffX, scaledOffY);
         SDL_RenderSetScale(renderer, oldScaleX, oldScaleY);
     }
 
+    /// Current scale, 1 if the child is drawn at its normal size.
     float getScale() const
     {
         return _scale;
     }
 
-    /// Size a widget wants to be drawn at: the extent of its content, which can be bigger than its min size.
-    static Size getNaturalSize(const Widget* widget)
+    /// Smallest size the child can be drawn unscaled at, including its margin.
+    const Size& getContentSize() const
     {
-        Size res = widget->getMinSize();
-        if (const auto container = dynamic_cast<const Container*>(widget)) {
-            for (const auto child: container->getChildren()) {
-                const auto natural = getNaturalSize(child);
-                res.width = std::max(res.width, child->getLeft() + natural.width + child->getMargin().right);
-                res.height = std::max(res.height, child->getTop() + natural.height + child->getMargin().bottom);
-            }
-        } else {
-            // leaf widgets, e.g. an item drawn at item_size while its min size is its image size
-            res.width = std::max(res.width, widget->getWidth());
-            res.height = std::max(res.height, widget->getHeight());
-        }
-        return res;
+        return _contentSize;
     }
 
 protected:
     Position toChildSpace(const int x, const int y) const override
     {
+        if (_scale >= 1.0f)
+            return {x, y};
         if (_scale <= 0.0f)
             return {-1, -1};
         return {
-            static_cast<int>(std::floor(static_cast<float>(x - _offset.left) / _scale)),
-            static_cast<int>(std::floor(static_cast<float>(y - _offset.top) / _scale)),
+            static_cast<int>(std::floor(static_cast<float>(x) / _scale)),
+            static_cast<int>(std::floor(static_cast<float>(y) / _scale)),
+        };
+    }
+
+    void measure()
+    {
+        const auto child = _children.front();
+        const auto& m = child->getMargin();
+        _childMinSize = child->getMinSize();
+        _contentSize = {m.left + _childMinSize.width + m.right, m.top + _childMinSize.height + m.bottom};
+        _minSize = {
+            static_cast<int>(std::lround(static_cast<float>(_contentSize.width) * MIN_SCALE)),
+            static_cast<int>(std::lround(static_cast<float>(_contentSize.height) * MIN_SCALE)),
         };
     }
 
     void relayout()
     {
-        _scale = 0.0f;
-        _offset = {0, 0};
-        if (_contentSize.width < 1 || _contentSize.height < 1 || _size.width < 1 || _size.height < 1)
+        if (_children.empty())
             return;
-        _scale = std::min(static_cast<float>(_size.width) / static_cast<float>(_contentSize.width),
-                          static_cast<float>(_size.height) / static_cast<float>(_contentSize.height));
-        _offset = {
-            static_cast<int>(std::lround((_size.width - _contentSize.width * _scale) / 2)),
-            static_cast<int>(std::lround((_size.height - _contentSize.height * _scale) / 2)),
-        };
+        _scale = 1.0f;
+        if (_size.width < 1 || _size.height < 1)
+            return; // not sized yet
+        if (_contentSize.width > _size.width)
+            _scale = std::min(_scale, static_cast<float>(_size.width) / static_cast<float>(_contentSize.width));
+        if (_contentSize.height > _size.height)
+            _scale = std::min(_scale, static_cast<float>(_size.height) / static_cast<float>(_contentSize.height));
+        // give the child all the (scaled) space, so growing children still fill the box
+        const auto child = _children.front();
+        const auto& m = child->getMargin();
+        const int scaledWidth = static_cast<int>(std::lround(static_cast<float>(_size.width) / _scale));
+        const int scaledHeight = static_cast<int>(std::lround(static_cast<float>(_size.height) / _scale));
+        child->setSize({
+            std::max(scaledWidth, _contentSize.width) - m.left - m.right,
+            std::max(scaledHeight, _contentSize.height) - m.top - m.bottom,
+        });
     }
 
-    float _scale = 0.0f;
-    Position _offset;
+    float _scale = 1.0f;
     Size _contentSize;
     Size _childMinSize;
 };

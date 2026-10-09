@@ -1,4 +1,5 @@
 #include "trackerview.h"
+#include <cmath>
 #include <string>
 #include <vector>
 #include <fmt/format.h>
@@ -697,8 +698,8 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
                                           node.getType().c_str());
 #endif
     
-    if (allowScale && node.getScaleToFit()) {
-        // build the node at its natural size inside a ScaleBox that draws it scaled to fit, like a map
+    if (allowScale && container == this && node.getScaleToFit()) {
+        // root layout: draw it scaled down instead of forcing its min size onto the window
         auto scaleBox = new ScaleBox(0, 0, 0, 0);
         if (!addLayoutNode(scaleBox, node, depth, false)) {
             delete scaleBox;
@@ -709,7 +710,7 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
     }
 
     const auto& children = node.getChildren();
-
+    
     if (node.getType() == "container" || node.getType() == "tab") {
         Container *w = new SimpleContainer(0,0,container->getWidth(),container->getHeight());
         w->setDropShaodw(node.getDropShadow(container->getDropShadow()));
@@ -975,6 +976,11 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
                 // TODO: move this somewhere to increase readability
                 // TODO: if tooltip is the same, just move it
                 MapWidget *map = static_cast<MapWidget*>(sender);
+                // map coordinates are in the scaled space of the layout, the tooltip is not scaled
+                const float scale = getLayoutScale();
+                const auto toView = [scale](int v) { return static_cast<int>(std::lround(static_cast<float>(v) * scale)); };
+                absX = toView(absX);
+                absY = toView(absY);
                 if (_mapTooltip) {
                     _mapTooltipScrollOffsets[_mapTooltipName] = _mapTooltip->getScrollY();
                     // remove references to old tooltip
@@ -1002,13 +1008,15 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
                         _tracker, locid, [this](auto ...args) { return makeItem(args...); });
                 // TODO: move mapTooltip to mapwidget?
                 // fix up position
-                int mapLeft = map->getAbsLeft()-_absX; // FIXME: this is not really a good solution
-                int mapTop = map->getAbsTop()-_absY;
+                int mapLeft = toView(map->getAbsLeft())-_absX; // FIXME: this is not really a good solution
+                int mapTop = toView(map->getAbsTop())-_absY;
+                const int mapWidth = toView(map->getWidth());
+                const int mapHeight = toView(map->getHeight());
                 // TODO: include window size in this calculation? (content can be bigger than window)
-                if (_mapTooltip->getLeft() + _mapTooltip->getWidth() > mapLeft + map->getWidth()) {
-                    if ((_mapTooltip->getLeft() + _mapTooltip->getWidth()) - (mapLeft + map->getWidth()) <= TOOL_MAX_DISPLACEMENT)
+                if (_mapTooltip->getLeft() + _mapTooltip->getWidth() > mapLeft + mapWidth) {
+                    if ((_mapTooltip->getLeft() + _mapTooltip->getWidth()) - (mapLeft + mapWidth) <= TOOL_MAX_DISPLACEMENT)
                         // displace so it fits
-                        _mapTooltip->setLeft(mapLeft + map->getWidth() - _mapTooltip->getWidth());
+                        _mapTooltip->setLeft(mapLeft + mapWidth - _mapTooltip->getWidth());
                     else {
                         // move it to left of cursor
                         _mapTooltip->setLeft(absX-_absX-_mapTooltip->getWidth()+off);
@@ -1020,10 +1028,10 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
                     _mapTooltip->setHeight(_size.height);
                     _mapTooltip->setTop(0);
                 }
-                else if (_mapTooltip->getTop() + _mapTooltip->getHeight() > mapTop + map->getHeight()) {
-                    if ((_mapTooltip->getTop() + _mapTooltip->getHeight()) - (mapTop + map->getHeight()) <= TOOL_MAX_DISPLACEMENT)
+                else if (_mapTooltip->getTop() + _mapTooltip->getHeight() > mapTop + mapHeight) {
+                    if ((_mapTooltip->getTop() + _mapTooltip->getHeight()) - (mapTop + mapHeight) <= TOOL_MAX_DISPLACEMENT)
                         // displace so it fits
-                        _mapTooltip->setTop(mapTop + map->getHeight() - _mapTooltip->getHeight());
+                        _mapTooltip->setTop(mapTop + mapHeight - _mapTooltip->getHeight());
                     else {
                         // move it to top of cursor
                         _mapTooltip->setTop(absY-_absY-_mapTooltip->getHeight()+off);
@@ -1165,6 +1173,27 @@ void TrackerView::setSize(Size size)
     //if (size == _size) return;
     // TODO: resize on next frame?
     SimpleContainer::setSize(size);
+}
+
+float TrackerView::getLayoutScale() const
+{
+    for (const auto child: _children) {
+        if (const auto scaleBox = dynamic_cast<const ScaleBox*>(child))
+            return scaleBox->getScale();
+    }
+    return 1.0f;
+}
+
+Size TrackerView::getPreferredSize() const
+{
+    Size res = _minSize;
+    for (const auto child: _children) {
+        if (const auto scaleBox = dynamic_cast<const ScaleBox*>(child)) {
+            const auto& content = scaleBox->getContentSize();
+            res = res || Size{scaleBox->getLeft() + content.width, scaleBox->getTop() + content.height};
+        }
+    }
+    return res;
 }
 
 void TrackerView::addChild(Widget* child)

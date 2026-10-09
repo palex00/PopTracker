@@ -25,6 +25,10 @@ public:
     virtual void setSize(Size size) override;
     virtual void addChild(Widget* child) override;
     void relayout();
+    /// Scale the layout is drawn at, below 1 if it has "scale_to_fit" and the view is smaller than its min size.
+    float getLayoutScale() const;
+    /// Size the view would like to have to draw the layout unscaled. Same as min size unless scaled.
+    Size getPreferredSize() const;
 
     std::list< std::pair<std::string,std::string> > getHints() const;
     const std::string& getLayoutRoot() const;
