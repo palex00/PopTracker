@@ -309,6 +309,11 @@
                                     "description": "Icon to display next to the title.",
                                     "type": "string"
                                 },
+                                "scale_to_fit": {
+                                    "description": "If true, the content is laid out at its natural size and drawn scaled to fit the available space (up or down, keeping its aspect ratio, centered), like a map. It then no longer forces a minimum size onto its parents.",
+                                    "type": "boolean",
+                                    "default": false
+                                },
                                 "content": {
                                     "description": "Content of the tab.",
                                     "anyOf": [
@@ -712,6 +717,11 @@
                         "center",
                         "stretch"
                     ]
+                },
+                "scale_to_fit": {
+                    "description": "If true, the content is laid out at its natural size and drawn scaled to fit the available space (up or down, keeping its aspect ratio, centered), like a map. It then no longer forces a minimum size onto its parents.",
+                    "type": "boolean",
+                    "default": false
                 },
                 "dropshadow": {
                     "description": "Enable/disable drop shadow. Only partially implemented.",

@@ -28,6 +28,7 @@ LayoutNode LayoutNode::FromJSON(json& j, std::unordered_map<std::string, const L
     // Members not overridden by class
     node._type       = to_string(j["type"], ""); // TODO: enum
     node._compact    = to_bool(j["compact"], false);
+    node._scaleToFit = to_bool(j["scale_to_fit"], false);
     node._item       = to_string(j["item"], to_string(j["icon"], "")); // we use the same variable for items and tabs
     node._header     = to_string(j["header"], to_string(j["title"],"")); // we use the same variable for groups and tabs
     node._key        = to_string(j["key"],"");

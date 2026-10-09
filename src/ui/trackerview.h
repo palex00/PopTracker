@@ -89,7 +89,7 @@ protected:
     void updateItem(Item* w, const BaseItem& item);
 
     size_t addLayoutNodes(Container* container, const std::list<LayoutNode>& nodes, size_t depth=0);
-    bool addLayoutNode(Container* container, const LayoutNode& node, size_t depth=0);
+    bool addLayoutNode(Container* container, const LayoutNode& node, size_t depth=0, bool allowScale=true);
 
     Item* makeItem(int x, int y, int w, int h, const std::string& code);
     Item* makeItem(int x, int y, int w, int h, const ::BaseItem& item, int stage1=-1, int stage2=0);

@@ -14,6 +14,7 @@
 #include "../uilib/dock.h"
 #include "../uilib/hbox.h"
 #include "../uilib/image.h"
+#include "../uilib/scalebox.h"
 #include "../uilib/scrollvbox.h"
 #include "../uilib/simplecontainer.h"
 #include "../uilib/tabs.h"
@@ -682,7 +683,7 @@ size_t TrackerView::addLayoutNodes(Container* container, const std::list<LayoutN
     }
     return n;
 }
-bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, size_t depth)
+bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, size_t depth, bool allowScale)
 {
     // This returns true if a child was added, false otherwise
     
@@ -696,8 +697,19 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
                                           node.getType().c_str());
 #endif
     
+    if (allowScale && node.getScaleToFit()) {
+        // build the node at its natural size inside a ScaleBox that draws it scaled to fit, like a map
+        auto scaleBox = new ScaleBox(0, 0, 0, 0);
+        if (!addLayoutNode(scaleBox, node, depth, false)) {
+            delete scaleBox;
+            return false;
+        }
+        container->addChild(scaleBox);
+        return true;
+    }
+
     const auto& children = node.getChildren();
-    
+
     if (node.getType() == "container" || node.getType() == "tab") {
         Container *w = new SimpleContainer(0,0,container->getWidth(),container->getHeight());
         w->setDropShaodw(node.getDropShadow(container->getDropShadow()));
