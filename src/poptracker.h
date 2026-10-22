@@ -1,7 +1,7 @@
 #ifndef _POPTRACKER_H
 #define _POPTRACKER_H
 
-#include "version.h"
+#include <version.h>
 #include "app.h"
 #include "uilib/ui.h"
 #include "ui/defaulttrackerwindow.h"
@@ -50,8 +50,7 @@ private:
     fs::path _exportFile;
     std::string _exportUID;
     fs::path _exportDir;
-    fs::path _homePackDir;
-    fs::path _appPackDir;
+    fs::path _homePackDir; /// used as fall-back if writing to default fails
     std::set<std::string> _debugFlags;
     std::set<std::string> _defaultDebugFlags;
 
@@ -77,7 +76,7 @@ private:
     void showBroadcast();
     void toggleAlwaysOnTop();
 
-    const fs::path& getPackInstallDir() const;
+    fs::path getPackInstallDir() const;
 
     bool saveConfig();
 

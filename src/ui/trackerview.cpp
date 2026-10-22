@@ -920,11 +920,13 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
             w->setMinSize({200,200});
             for (const auto& pair : _tracker->getMapLocations(mapname)) {
                 // NOTE: state and highlight are set later
+                auto shape = pair.second.getShape(map.getLocationShape());
                 w->addLocation(pair.first, {
                     pair.second.getX(), pair.second.getY(),
                     pair.second.getSize(map.getLocationSize()),
-                    pair.second.getBorderThickness(map.getLocationBorderThickness()),
-                    pair.second.getShape(map.getLocationShape()),
+                    pair.second.getBorderThickness(shape, map.getLocationBorderThickness(), map.getLocationBorderStrength()),
+                    shape,
+                    pair.second.getOrientation(map.getLocationOrientation()),
                 });
             }
 #ifndef NDEBUG
@@ -1114,7 +1116,10 @@ bool TrackerView::addLayoutNode(Container* container, const LayoutNode& node, si
     }
     else if (node.getType() == "layout") {
         _layoutRefs.push_back(node.getKey());
-        return addLayoutNode(container, _tracker->getLayout(node.getKey()), depth+1);
+        if (_tracker->hasLayout(node.getKey()))
+            return addLayoutNode(container, _tracker->getLayout(node.getKey()), depth+1);
+        fprintf(stderr, "Missing layout for: %s\n", sanitize_print(node.getKey()).c_str());
+        return false;
     }
     else if (node.getType() == "text") {
         Label *w = new Label(node.getPosition().x, node.getPosition().y, 0, 0, _font, node.getText());

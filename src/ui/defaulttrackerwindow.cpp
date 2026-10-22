@@ -92,7 +92,7 @@ DefaultTrackerWindow::DefaultTrackerWindow(const char* title, SDL_Surface* icon,
                 true);
     }
 
-    _loadPackWidget = new LoadPackWidget(0,0,0,0,_fontStore);
+    _loadPackWidget = new LoadPackWidget(0,0,0,0,_fontStore, this);
     _loadPackWidget->setPosition({0,0});
     _loadPackWidget->setSize(_size);
     _loadPackWidget->setBackground({0,0,0});
@@ -362,17 +362,21 @@ void DefaultTrackerWindow::showOpen()
 {
     _loadPackWidget->update();
     _loadPackWidget->setVisible(true);
+    _loadPackWidget->focusFilter();
 }
 void DefaultTrackerWindow::hideOpen()
 {
+    _loadPackWidget->releaseFilterFocus();
     _loadPackWidget->setVisible(false);
 }
 
 void DefaultTrackerWindow::showProgress(const std::string& text, int progress, int max)
 {
-    char percentText[5];
-    if (max>0) snprintf(percentText, 5, "%3u%%", upercent(progress, max));
-    else percentText[0] = 0;
+    char percentText[12];
+    if (max > 0)
+        snprintf(percentText, 12, "%3u%%", upercent(progress, max)); // TODO: fmt
+    else
+        percentText[0] = 0;
     std::string valuesText = format_bytes(progress) + "B";
     if (max) valuesText += " / " + format_bytes(max) + "B";
 

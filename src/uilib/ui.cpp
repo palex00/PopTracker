@@ -28,7 +28,7 @@
 
 namespace Ui {
 
-Ui::Ui(const char *name, bool fallbackRenderer)
+Ui::Ui(const char *name, bool fallbackRenderer, const bool vsync)
 {
     _name = name;
     _fallbackRenderer = fallbackRenderer;
@@ -46,6 +46,9 @@ Ui::Ui(const char *name, bool fallbackRenderer)
 
     if (_fallbackRenderer) {
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+    }
+    if (vsync) {
+        SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
     }
 
 #ifdef SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR /* available beginning SDL 2.0.8 */
@@ -157,6 +160,11 @@ bool Ui::render()
         if (_fpsLimit < 1) {
             _fpsLimit = DEFAULT_FPS_LIMIT;
         }
+    }
+
+    bool vsync = false;
+    for (const auto& pair : _windows) {
+        vsync |= pair.second->isVSync();
     }
 
     #define FRAME_TIME (1000/_fpsLimit) // TODO: microseconds
@@ -273,7 +281,34 @@ bool Ui::render()
                             }
                         }
                     }
+                    {
+                        auto winIt = _windows.find(ev.key.windowID);
+                        if (winIt != _windows.end()) {
+                            Widget* focus = winIt->second->getKeyboardFocus();
+                            if (focus) {
+                                focus->onKeyDown.emit(focus,
+                                        (int)ev.key.keysym.sym,
+                                        (int)(ev.key.keysym.mod & (KMOD_CTRL|KMOD_SHIFT|KMOD_GUI)));
+                            }
+                        }
+                    }
                     EVENT_UNLOCK(this);
+                    break;
+                }
+                case SDL_TEXTINPUT: {
+                    EVENT_LOCK(this);
+                    auto winIt = _windows.find(ev.text.windowID);
+                    if (winIt != _windows.end()) {
+                        Widget* focus = winIt->second->getKeyboardFocus();
+                        if (focus) {
+                            focus->onTextInput.emit(focus, std::string(ev.text.text));
+                        }
+                    }
+                    EVENT_UNLOCK(this);
+                    break;
+                }
+                case SDL_TEXTEDITING: {
+                    // IME text editing is not supported yet
                     break;
                 }
                 case SDL_WINDOWEVENT: {
@@ -411,9 +446,8 @@ bool Ui::render()
             _lastEventType = ev.type;
         }
         t1 = SDL_GetTicks();
-        #ifndef VSYNC
-        if (destructiveEvent) break; // framebuffer destroyed -> redraw ASAP (unless VSYNC)
-        #endif
+        if (destructiveEvent && !vsync)
+            break; // framebuffer destroyed -> redraw ASAP (unless VSYNC)
 #if defined __EMSCRIPTEN__
     } while (false); // waiting for events makes no sense in a browser context
 #else
@@ -429,8 +463,8 @@ bool Ui::render()
 
     uint32_t t2 = SDL_GetTicks();
     uint32_t td = t2-t1;
-#if !defined VSYNC && !defined __EMSCRIPTEN__
-    if (_fpsLimit)
+#if !defined __EMSCRIPTEN__
+    if (_fpsLimit && !vsync)
     {
         // usleep the rest between last frame's timestamp and now to have a constant frame time
         uint64_t timestamp = getMicroTicks();

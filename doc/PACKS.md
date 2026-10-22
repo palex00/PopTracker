@@ -300,7 +300,16 @@ a table representing an enum with the following constants: \
     - `greyscale`: same as `saturation|0`; since 0.32.2
     - `grayscale`: same as `greyscale`; since 0.35.4
     - NOTE: order matters, applied left to right
-  + inherit_codes: true will make stage3 provide codes for item, stage1, 2 and 3 (default true)
+  + inherit_codes: `true` (the default) will make a stage also provide all codes the previous stage provides.
+    See the table below for an example.
+    | Stage    | `codes`  | `inherit_codes` | Resulting Codes |
+    | -------- | -------- | --------------- | --------------- |
+    | 1        | a        | `false`         | a               |
+    | 2        | b        | `false`         | b               |
+    | 3        | c        | `true`          | b,c             |
+    | 4        | d        | `true`          | b,c,d           |
+    | 5        | e        | `false`         | e               |
+    | 6        | f        | `true`          | e,f             |
 
 * `"toggle"`:
   + only has on/off
@@ -386,7 +395,28 @@ Maps are referenced by name in layouts.
             "name": "map_identifier",
             "location_size": 24, // size of locations on the map, unit is pixels of img
             "location_border_thickness": 2, // border around the locations
-            "location_shape": "rect", // or "diamond", since 0.26.2, or "trapezoid", since 0.32.0
+                                            // specifically, this is how much the border extrudes outside
+                                            // the location along the coordinate axes (on each side).
+                                            // the total dimensions of the icon (including the border)
+                                            // are size + 2 * border thickness
+            "location_border_strength": 2, // the strength of the border around the location
+                                           // this is an optional alternative parameter to the location border thickness,
+                                           // which specifies the thickness of the stroke of the border around the shape instead.
+                                           // it is related to border thickness in the following ways:
+                                           // for rect and trapezoid, it is the same;
+                                           // for diamond, it is border thickness / sqrt(2);
+                                           // for triangle, it is border thickness / sqrt(5);
+                                           // for concave_kite, it is border thickness * 2 / (sqrt(5) + sqrt(13)).
+                                           //
+                                           // if this value is specified, it overrides the location_border_thickness
+                                           // parameter, but it will still be overridden by the border_thickness parameter
+                                           // assigned to specific locations.
+                                           //
+                                           // field added in 0.36.0.
+            "location_shape": "rect", // or "diamond", since 0.26.2, or "trapezoid", since 0.32.0,
+                                      // or "triangle" or "concave_kite", since 0.36.0.
+            "location_orientation": "north", // or "south", "east", or "west". field added in 0.36.0.
+                                             // only affects trapezoid, triangle, and concave kite shapes.
             "img": "path/to/img.png"
         },
         ...
@@ -432,6 +462,7 @@ Locations define drops on maps, rules to have them accessible as well as the loo
                             "y": 234,
                             "size": 24, // override map default, since 0.21.1
                             "border_thickness": 2, // override map default, since 0.21.1
+                            "border_strength": 2, // override map default, since 0.36.0
                             "shape": "rect", // override map default, since 0.26.2
                             "restrict_visibility_rules": [
                                 ...  // additional visibility rules for individual map locations, since 0.26

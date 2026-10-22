@@ -24,6 +24,10 @@ env:
   APPRUN_HOOKS_URL: 'https://github.com/AppImageCrafters/AppRun/releases/download/v2.0.0/libapprun_hooks-Release-x86_64.so'
   APPRUN_HOOKS_HASH: '1f64dd2161be3242f106c891b2daf27bbdd2103c20b28f57f61a56cdccb1eb6a'
   APPRUN_HOOKS_NAME: 'libapprun_hooks-Release-x86_64.so'
+  ADVANCECOMP_URL: 'https://github.com/amadvance/advancecomp/releases/download/v2.6/advancecomp-2.6-windows-x64.zip'
+  ADVANCECOMP_HASH: '39478e2810d2e6fecea321d11a8e8aad678e9e52f83c684d85dcb70342607704'
+  JQ_WIN64_URL: 'https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-win64.exe'
+  JQ_WIN64_HASH: 'a6fc67fedaf9128a3309a1e2ebb8b986aeccf70122ee46d2cb4849e423f0c627'
 
 jobs:
   release-main:
@@ -43,11 +47,11 @@ jobs:
         cd PopTracker
         mv "../${POP_NAME}_full-source.tar.xz" .
     - name: Attest Source bundle
-      uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6  # v4.2.0
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
       with:
         subject-path: "*_full-source.tar.xz"
     - name: Create Release
-      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
       with:
         draft: true
         prerelease: true
@@ -64,15 +68,21 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+    - name: Set env
+      run: |
+        echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+        # force AppImage ARCH to x86_64 to match AppImage runtime and AppRun
+        ARCH=x86_64
+        echo "ARCH=$ARCH" >> $GITHUB_ENV
     - name: Install dependencies
+      timeout-minutes: 5
       run: |
         sudo apt-get update -y -qq
-        sudo apt-get install coreutils build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev p7zip wget libgtest-dev libgmock-dev
+        sudo apt-get install coreutils build-essential meson jq p7zip wget \
+          libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libgtest-dev libgmock-dev
     - uses: actions/checkout@v7.0.1
       with:
         submodules: recursive
-    - name: Set env
-      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
     - name: Set version
       run: |
         sed -i "s/version: latest/version: ${{ env.RELEASE_VERSION }}/g" linux/AppImageBuilder.yml
@@ -127,13 +137,13 @@ jobs:
           -g --runtime-file "appimage-build/prime/$APPIMAGE_RUNTIME_NAME" \
           AppDir
     - name: Attest Build, AppImage and zsync
-      uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6  # v4.2.0
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
       with:
         subject-path: |
-          appimage-build/linux-x86_64/poptracker
+          appimage-build/build/poptracker
           *.AppImage*
     - name: Create Release
-      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
       with:
         draft: true
         prerelease: true
@@ -153,36 +163,38 @@ jobs:
           - ubuntu-22.04-arm
 
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update -y -qq
-        sudo apt-get install coreutils build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev p7zip wget libgtest-dev libgmock-dev
-    - uses: actions/checkout@v7.0.1
-      with:
-        submodules: recursive
     - name: Set env
       shell: bash
       run: |
         echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
-        OS=`uname -s | tr A-Z a-z`
-        ARCH=`uname -m`
-        echo "OS=$OS" >> $GITHUB_ENV
-        echo "ARCH=$ARCH" >> $GITHUB_ENV
-        echo "UNAME=$OS-$ARCH" >> $GITHUB_ENV
+        # TODO: validate RELEASE_VERSION matches Meson project version
+    - name: Install dependencies
+      timeout-minutes: 5
+      run: |
+        sudo apt-get update -y -qq
+        sudo apt-get install coreutils build-essential meson jq p7zip \
+          libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libgtest-dev libgmock-dev
+    - uses: actions/checkout@v7.0.1
+      with:
+        submodules: recursive
     - name: Build RELEASE
-      run: make native CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }} -j4
+      run: |
+        meson setup build
+        meson compile -C build
     - name: Run tests
-      run: make test CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }}
-    - name: Build DIST # this builds a .tar.xz
-      run: make CONF=DIST VERSION=${{ env.RELEASE_VERSION }}
+      run: |
+        meson test -C build
+    - name: Build DIST # this builds a .tar.xz, maybe .deb in the future
+      run: |
+        meson compile -C build package
     - name: Attest Build and Archive
-      uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6  # v4.2.0
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
       with:
         subject-path: |
-          build/${{ env.UNAME }}/poptracker
+          build/poptracker
           dist/*
     - name: Create Release
-      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
       with:
         draft: true
         prerelease: true
@@ -203,49 +215,52 @@ jobs:
           - macos-15        # arm64 (Apple Silicon)
 
     steps:
-    - name: Install dependencies
-      run: |
-        brew install coreutils SDL2 sdl2_ttf sdl2_image openssl@3.0 automake googletest || true
-        # required, but pre-installed: libtool autoconf
-    - uses: actions/checkout@v7.0.1
-      with:
-        submodules: recursive
     - name: Set env
       shell: bash
       run: |
         echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
-        OS=darwin
         ARCH=`uname -m`
-        echo "OS=$OS" >> $GITHUB_ENV
         echo "ARCH=$ARCH" >> $GITHUB_ENV
-        echo "UNAME=$OS-$ARCH" >> $GITHUB_ENV
+    - uses: actions/checkout@v7.0.1
+      with:
+        submodules: recursive
+    - name: Install dependencies
+      timeout-minutes: 5
+      run: |
+        brew bundle --file=macosx/dev-Brewfile
     - name: Build RELEASE
-      run: make native CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }} -j4
+      run: |
+        meson setup build
+        meson compile -vC build
     - name: Run tests
-      run: make test CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }}
-    - name: Build DIST # this builds the app bundle, zips it and maybe .dmg in the future
-      run: make CONF=DIST VERSION=${{ env.RELEASE_VERSION }}
+      run: |
+        meson test -C build
+    - name: Build DIST # this builds the app bundle
+      run: |
+        meson compile -vC build package
     - name: Package app bundle for universal merge
       run: |
         # tar preserves the bundle's symlinks and permissions across the artifact round-trip.
-        tar -czf "poptracker-${{ env.ARCH }}.tar.gz" -C "build/${{ env.UNAME }}" poptracker.app
+        tar -czf "poptracker-${{ env.ARCH }}.tar.gz" -C "build" poptracker.app
     - name: Upload per-arch app bundle
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: macos-app-${{ env.ARCH }}
         path: poptracker-${{ env.ARCH }}.tar.gz
         if-no-files-found: error
+        retention-days: 1  # the minimum; merging into universal should run immediately after
+        compression-level: 0  # already compressed
 
   release-macos-universal:
     needs: release-macos
     runs-on: macos-15
     steps:
-    - uses: actions/checkout@v7.0.1
     - name: Set env
       shell: bash
       run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+    - uses: actions/checkout@v7.0.1
     - name: Download per-arch app bundles
-      uses: actions/download-artifact@v8.0.1
+      uses: actions/download-artifact@v8.0.2
       with:
         pattern: macos-app-*
         path: dl
@@ -268,13 +283,13 @@ jobs:
         ditto -c -k --keepParent --sequesterRsrc --zlibCompressionLevel 9 poptracker.app "dist/poptracker_${VS}_macos_universal.zip"
         ls -l dist
     - name: Attest Build and AppBundle
-      uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6  # v4.2.0
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
       with:
         subject-path: |
           poptracker.app/Contents/MacOS/poptracker
           dist/*
     - name: Create Release
-      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
       with:
         draft: true
         prerelease: true
@@ -290,6 +305,7 @@ jobs:
 
     steps:
     - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884  # v2.32.0
+      timeout-minutes: 5
       with:
         cache: false
         update: true
@@ -306,9 +322,25 @@ jobs:
           mingw64/mingw-w64-x86_64-freetype
           mingw64/mingw-w64-x86_64-openssl
           mingw64/mingw-w64-x86_64-gtest
+          mingw64/mingw-w64-x86_64-meson
           p7zip
           wget
-          mingw-w64-x86_64-advancecomp
+    - name: Set env
+      shell: msys2 {0}
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
+    - name: Install advzip and jq
+      shell: msys2 {0}
+      run: |
+        # TODO: switch back to msys packages once we switch to ucrt
+        wget -O advancecomp.zip \
+          "${ADVANCECOMP_URL}"
+        echo "${ADVANCECOMP_HASH} advancecomp.zip" | sha256sum -c
+        wget -O jq.exe \
+          "${JQ_WIN64_URL}"
+        echo "${JQ_WIN64_HASH} jq.exe" | sha256sum -c
+        mkdir -p "$HOME/.local/bin"
+        7z e "-o$HOME/.local/bin" advancecomp.zip '*.exe'
+        mv jq.exe "$HOME/.local/bin/"
     - uses: actions/checkout@v7.0.1
       with:
         submodules: recursive
@@ -322,15 +354,18 @@ jobs:
       shell: msys2 {0}
       run: |
           pacman -R --noconfirm mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image mingw-w64-x86_64-SDL2_ttf
-    - name: Set env
-      shell: msys2 {0}
-      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/v}" >> $GITHUB_ENV
     - name: Build RELEASE
       shell: msys2 {0}
-      run: make native CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }} -j4
+      run: |
+        GCC_ARCH=$(gcc -dumpmachine | sed "s/-.*$//")
+        meson setup build \
+          -Dcpp_args="-I$(realpath ./win32-lib/$GCC_ARCH/include)" \
+          -Dcpp_link_args="-L$(realpath ./win32-lib/$GCC_ARCH/lib) -lpng -ljpeg -limm32 -lwinmm -lversion"
+        meson compile -C build
     - name: Run tests
       shell: msys2 {0}
-      run: make test CONF=RELEASE VERSION=${{ env.RELEASE_VERSION }}
+      run: |
+        meson test -C build
     - name: Download Updater
       shell: msys2 {0}
       env:
@@ -345,15 +380,17 @@ jobs:
         7z e -obuild/win64 updater.zip
     - name: Build DIST # this builds the app bundle, zips it and maybe .dmg in the future
       shell: msys2 {0}
-      run: make CONF=DIST VERSION=${{ env.RELEASE_VERSION }}
+      run: |
+        export PATH="$PATH:$HOME/.local/bin"  # advzip
+        meson compile -C build package
     - name: Attest Build and Archive
-      uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6  # v4.2.0
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
       with:
         subject-path: |
-          build/win64/poptracker.exe
+          build/poptracker.exe
           dist/*
     - name: Create Release
-      uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
       with:
         draft: true
         prerelease: true

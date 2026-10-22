@@ -22,6 +22,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shellapi.h>
+#include <winuser.h>
 #endif
 using nlohmann::json;
 using Ui::Dlg;
@@ -137,6 +138,20 @@ static json windowToJson(Ui::Window* win)
     };
 }
 
+static uint8_t readOpacity(const json& value, uint8_t fallback)
+{
+    if (!(value.is_number_integer() || value.is_number_unsigned() || value.is_number_float())) {
+        return fallback;
+    }
+
+    double opacity = value.get<double>();
+    opacity *= 255.0;
+    if (opacity < 0.0) opacity = 0.0;
+    if (opacity > 255.0) opacity = 255.0;
+
+    return static_cast<uint8_t>(opacity + 0.5);
+}
+
 PopTracker::PopTracker([[maybe_unused]] int argc, [[maybe_unused]] char** argv, bool cli, const json& args)
 {
     _args = args;
@@ -160,6 +175,15 @@ PopTracker::PopTracker([[maybe_unused]] int argc, [[maybe_unused]] char** argv, 
     if (readFile(colorsFilename, colorsData)) {
         _colors = parse_jsonc(colorsData);
         if (_colors.is_object()) {
+            auto tooltipOpacity = _colors.find("MapTooltip.Opacity");
+            if (tooltipOpacity != _colors.end()) {
+                if (tooltipOpacity->is_number()) {
+                    Ui::MapTooltip::TooltipOpacity = readOpacity(*tooltipOpacity, Ui::MapTooltip::TooltipOpacity);
+                } else {
+                    fprintf(stderr, "Warning: invalid opacity in colors.json\n");
+                }
+            }
+
             auto& stateColors = _colors["MapWidget.StateColors"];
             if (stateColors.is_array()) {
                 ssize_t i = 0;
@@ -211,6 +235,8 @@ PopTracker::PopTracker([[maybe_unused]] int argc, [[maybe_unused]] char** argv, 
         _config["log"] = false;
     if (_config["software_renderer"].type() != json::value_t::boolean)
         _config["software_renderer"] = false;
+    if (!_config["vsync"].is_boolean())
+        _config["vsync"] = false;
     if (_config["enable_screensaver"].type() != json::value_t::boolean)
         _config["enable_screensaver"] = true;
     if (!_config["show_always_on_top_button"].is_boolean())
@@ -228,8 +254,13 @@ PopTracker::PopTracker([[maybe_unused]] int argc, [[maybe_unused]] char** argv, 
             }
         }
 #if defined _WIN32 || defined WIN32
-        if (_config["ignore_hidpi"] == true)
+        if (_config["ignore_hidpi"] == true) {
+            #if _WIN32_WINNT >= 0x0600
             SetProcessDPIAware();
+            #else
+            fprintf(stderr, "Warning: requested DPIAware but API is not available in target Windows version!\n");
+            #endif
+        }
 #endif
 
 #ifndef WITHOUT_UPDATE_CHECK
@@ -345,10 +376,10 @@ PopTracker::PopTracker([[maybe_unused]] int argc, [[maybe_unused]] char** argv, 
 
     auto homePopTrackerPath = homePath / "PopTracker";
     _homePackDir = homePopTrackerPath / "packs";
-    _appPackDir = appPath / "packs";
+    auto appPackDir = appPath / "packs";
 
     if (!homePath.empty()) {
-        Pack::addSearchPath(_homePackDir); // default user packs
+        Pack::addSearchPath(_homePackDir); // default (normal) or fall-back (portable) user packs
         if (!_isPortable) {
             // default user overrides
             auto homeUserOverrides = homePopTrackerPath / "user-override";
@@ -373,9 +404,21 @@ PopTracker::PopTracker([[maybe_unused]] int argc, [[maybe_unused]] char** argv, 
     }
 
     if (!appPath.empty() && appPath != "." && appPath != cwdPath) {
-        Pack::addSearchPath(_appPackDir); // system packs
+        Pack::addSearchPath(appPackDir); // portable/system packs
         Pack::addOverrideSearchPath(appPath / "user-override"); // portable/system overrides
-        Assets::addSearchPath(appPath / "assets"); // system assets
+        Assets::addSearchPath(appPath / "assets"); // portable/system assets
+    }
+
+    if (appPath.filename().u8string() == "bin"
+            || (!appPath.has_filename() && appPath.parent_path().filename().u8string() == "bin")
+    ) {
+        // Add */share/poptracker/* to search paths to fit common unix-like file system layout when running from */bin.
+        // We do this during runtime (not configure time), so the same executable can be installed in multiple ways.
+        auto systemDataDir = appPath / ".." / "share" / "poptracker";
+        Pack::addSearchPath(systemDataDir / "packs"); // system packs in .../share/poptracker
+        Pack::addOverrideSearchPath(systemDataDir / "user-override"); // system overrides in .../share/poptracker
+        Assets::addSearchPath(systemDataDir / "assets"); // system assets in .../share/poptracker
+        // TODO: set _appPackDir to systemDataDir/packs if appPath/packs does not exist?
     }
 
     _asio = new asio::io_service();
@@ -466,7 +509,9 @@ bool PopTracker::start()
     }
 #endif
 
-    _ui = new Ui::Ui(APPNAME, _config["software_renderer"] ? true : false);
+    _ui = new Ui::Ui(APPNAME,
+        _config["software_renderer"] ? true : false,
+        _config["vsync"] ? true : false);
     _ui->setFPSLimit(_config["fps_limit"].get<unsigned>(), _config["software_fps_limit"].get<unsigned>());
     _ui->onWindowDestroyed += {this, [this](void*, Ui::Window *win) {
         if (win == _broadcast) {
@@ -1134,11 +1179,9 @@ bool PopTracker::InstallPack(const std::string& uid, PackManager::confirmation_c
     return res;
 }
 
-const fs::path& PopTracker::getPackInstallDir() const
+fs::path PopTracker::getPackInstallDir() const
 {
-    if ((!_isPortable && fs::is_directory(_homePackDir)) || !isWritable(_appPackDir))
-        return _homePackDir;
-    return _appPackDir;
+    return Pack::getDefaultPackDir();
 }
 
 void PopTracker::unloadTracker()

@@ -45,9 +45,11 @@ protected:
     SDL_Renderer *_ren = nullptr;
     FontStore *_fontStore = nullptr; // TODO; pass as argument to window constructor?
     FONT _font = nullptr;
+    Uint32 _rendererFlags = 0;
 
     Position _lastMousePos;
     Widget* _tooltip = nullptr;
+    Widget* _keyboardFocus = nullptr;
     bool _isAlwaysOnTop = false;
 
     void clear();
@@ -83,7 +85,18 @@ public:
     bool getAlwaysOnTop() const;
     virtual void setAlwaysOnTop(bool alwaysOnTop);
 
-    bool isAccelerated();
+    void setKeyboardFocus(Widget* w);
+    Widget* getKeyboardFocus() const { return _keyboardFocus; }
+
+    bool isAccelerated() const
+    {
+        return (_rendererFlags & SDL_RENDERER_ACCELERATED);
+    }
+
+    bool isVSync() const
+    {
+        return (_rendererFlags & SDL_RENDERER_PRESENTVSYNC);
+    }
 
     Signal<int, int, DropType, std::string> onDrop; // x, y, type, data
 };
