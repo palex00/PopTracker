@@ -2,14 +2,26 @@ name: Fuzz
 on:
   workflow_dispatch:
   schedule:
-  - cron: "0 4 * * *"
+  - cron: "13 4 * * *"  # every day at 04:13
 
 permissions: {}
 
 jobs:
   fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shell: bash
+            llvm-version: 23
+
     name: Fuzz
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
       - name: Install dependencies (apt)
@@ -23,14 +35,16 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x ./llvm.sh
-          sudo ./llvm.sh 22 all
-          sudo apt install clang-tools-22
+          sudo ./llvm.sh ${{ matrix.llvm-version }} all
+          sudo apt install clang-tools-${{ matrix.llvm-version }}
       - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
       - name: Build fuzzer
         run: |
-          CC=clang-22 CXX=clang++-22 AR=llvm-ar-22 \
+          CC=clang-${{ matrix.llvm-version }} \
+          CXX=clang++-${{ matrix.llvm-version }} \
+          AR=llvm-ar-${{ matrix.llvm-version }} \
             meson setup -Dauto-lto=false --buildtype debugoptimized -Doptimization=2 -Db_sanitize=address,undefined build
           meson compile -C build fuzzer
       - name: Restore corpus
@@ -51,7 +65,7 @@ jobs:
         run: ./build/test/fuzzer -max_total_time=897 -workers=4 -jobs=4 corpus/
       - name: Store logs
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: log
           path: fuzz-*.log
@@ -60,7 +74,7 @@ jobs:
           retention-days: 3
       - name: Store oom
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: oom
           path: oom-*
@@ -68,7 +82,7 @@ jobs:
           retention-days: 3
       - name: Store crashes
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: crash
           path: crash-*

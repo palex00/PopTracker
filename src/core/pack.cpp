@@ -423,7 +423,7 @@ Ui::Size Pack::getImageSize(const std::string &userFile) const
     if (ReadFile(userFile, data, true, Ui::getMaxImageHeaderLength()))
         size = Ui::getImageSize(data);
     else
-        fprintf(stderr, "Error reading image file %s to get size\n", sanitize_print(userFile).c_str());
+        fprintf(stderr, "Error reading image file \"%s\" to get size\n", sanitize_print(userFile).c_str());
     _imageSizeCache.emplace(userFile, size);
     return size;
 }
@@ -577,6 +577,26 @@ bool Pack::isInSearchPath(const fs::path& path)
 const std::vector<fs::path>& Pack::getSearchPaths()
 {
     return _searchPaths;
+}
+
+fs::path Pack::getDefaultPackDir()
+{
+    const auto appPath = fs::app_path();
+    const bool isPortable = !appPath.empty() && fs::is_regular_file(appPath / "portable.txt");
+    const auto homePath = fs::home_path();
+    auto homePackDir = homePath.empty() ? fs::path() : homePath / "PopTracker" / "packs";
+    auto appPackDir = appPath / "packs";
+    // in portable mode, prefer appPackDir if writable
+    if (isPortable && !appPath.empty() && fs::is_directory(appPackDir) && isWritable(appPackDir))
+        return appPackDir;
+    // if homePackDir already exists, use that even in portable mode
+    if (!homePath.empty() && fs::is_directory(homePackDir) && isWritable(homePackDir))
+        return homePackDir;
+    // in portable mode or if home is n/a, and no pack dir exists, prefer to create appPackDir
+    if ((isPortable || homePath.empty())  && fs::is_directory(appPath) && isWritable(appPath))
+        return appPackDir;
+    // otherwise use homePackDir
+    return homePackDir;
 }
 
 void Pack::addOverrideSearchPath(const fs::path& path)

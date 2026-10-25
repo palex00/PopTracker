@@ -45,7 +45,6 @@ common_src += files(
     'ui/trackerview.cpp',
     'ui/trackerwindow.cpp',
     'uilib/button.cpp',
-    'uilib/dlg.cpp',
     'uilib/dock.cpp',
     'uilib/drawhelper.cpp',
     'uilib/fontstore.cpp',
@@ -65,3 +64,12 @@ common_src += files(
     'uilib/window.cpp',
     'usb2snes/usb2snes.cpp',
 )
+
+if host_machine.system() == 'windows'
+    common_src += files('uilib/dlg_win32.cpp')
+elif host_machine.system() == 'darwin'
+    add_languages('objcpp')
+    common_src += files('uilib/dlg_cocoa.mm')
+else
+    common_src += files('uilib/dlg_tinyfd.cpp')
+endif

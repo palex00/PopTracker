@@ -79,7 +79,7 @@ jobs:
           build/poptracker
           dist/*
     - name: Store DIST
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         path: dist/*
         archive: false
@@ -162,13 +162,13 @@ jobs:
           appimage-build/build/poptracker
           *.AppImage*
     - name: Store AppImage
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         path: "*.AppImage"
         archive: false
         if-no-files-found: error
     - name: Store zsync
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         path: "*.AppImage.zsync"
         archive: false
@@ -211,7 +211,7 @@ jobs:
     - name: Run tests
       run: |
         meson test -C build
-    - name: Build DIST # this builds the app bundle, zips it and maybe .dmg in the future
+    - name: Build DIST # this builds the per-arch app bundle
       run: |
         meson compile -vC build package
     - name: Check DIST
@@ -227,7 +227,7 @@ jobs:
         # symlinks and permissions across the artifact round-trip.
         tar -czf "poptracker-${{ env.ARCH }}.tar.gz" -C "build" poptracker.app
     - name: Upload per-arch app bundle
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: macos-app-${{ env.ARCH }}
         path: poptracker-${{ env.ARCH }}.tar.gz
@@ -241,7 +241,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
     - name: Download per-arch app bundles
-      uses: actions/download-artifact@v8.0.1
+      uses: actions/download-artifact@v8.0.2
       with:
         pattern: macos-app-*
         path: dl
@@ -271,7 +271,7 @@ jobs:
           poptracker.app/Contents/MacOS/poptracker
           dist/*
     - name: Store universal ZIP
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         path: dist/*
         archive: false
@@ -304,7 +304,6 @@ jobs:
           mingw64/mingw-w64-x86_64-openssl
           mingw64/mingw-w64-x86_64-gtest
           mingw64/mingw-w64-x86_64-meson
-          mingw64/mingw-w64-x86_64-ntldd
           p7zip
           wget
     - name: Install advzip and jq
@@ -349,9 +348,6 @@ jobs:
           -Dcpp_args="-I$(realpath ./win32-lib/$GCC_ARCH/include)" \
           -Dcpp_link_args="-L$(realpath ./win32-lib/$GCC_ARCH/lib) -lpng -ljpeg -limm32 -lwinmm -lversion"
         meson compile -v -C build
-    - name: List linked libraries
-      shell: msys2 {0}
-      run: ntldd build/poptracker.exe  # TODO: warn if not static
     - name: Run tests
       shell: msys2 {0}
       run: |
@@ -368,6 +364,7 @@ jobs:
           "https://github.com/black-sliver/PopUpdater/releases/download/${UPDATER_VERSION}/PopUpdater_${UPDATER_VERSION}_${UPDATER_OS}-${UPDATER_ARCH}.zip"
         echo "${UPDATER_ZIP_HASH} updater.zip" | sha256sum -c
         7z e -obuild/ updater.zip
+        sha256sum build/PopUpdater.exe
     - name: Build DIST # this builds a release ZIP
       shell: msys2 {0}
       run: |
@@ -381,7 +378,7 @@ jobs:
           build/poptracker.exe
           dist/*
     - name: Store DIST
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         path: dist/*
         archive: false
@@ -400,7 +397,7 @@ jobs:
           build/poptracker.exe
           dist/poptracker-${{ env.UNAME }}-debug.zip
     - name: Store DEBUG
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         path: dist/poptracker-${{ env.UNAME }}-debug.zip
         archive: false
